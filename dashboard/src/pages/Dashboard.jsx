@@ -23,6 +23,14 @@ async function fetchDashboard(slug) {
 
 // ── Icon Components ─────────────────────────────────────────────────
 
+function UsersIcon() {
+  return (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+    </svg>
+  )
+}
+
 function DollarIcon() {
   return (
     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -39,18 +47,10 @@ function ClockIcon() {
   )
 }
 
-function ShieldIcon() {
+function TrendingUpIcon() {
   return (
     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-    </svg>
-  )
-}
-
-function CalendarIcon() {
-  return (
-    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
     </svg>
   )
 }
@@ -84,25 +84,25 @@ function StatCard({ icon, label, value, subtext, accent = false }) {
   )
 }
 
-// ── Vibe Check Breakdown ────────────────────────────────────────────
+// ── Client Acquisition Funnel ───────────────────────────────────────
 
-function VibeCheckBar({ approved, filtered }) {
+function AcquisitionFunnel({ approved, filtered }) {
   const total = approved + filtered
   const approvedPct = total > 0 ? (approved / total) * 100 : 0
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm border border-brand-pink/20">
       <h3 className="text-sm font-medium text-brand-charcoal/60 uppercase tracking-wide mb-4">
-        Vibe Check Stats
+        Client Acquisition Funnel
       </h3>
       <div className="flex items-end justify-between mb-3">
         <div>
           <span className="text-2xl font-bold font-display">{approved}</span>
-          <span className="text-sm text-brand-charcoal/50 ml-1">approved</span>
+          <span className="text-sm text-brand-charcoal/50 ml-1">acquired</span>
         </div>
         <div className="text-right">
           <span className="text-2xl font-bold font-display text-brand-pink-dark">{filtered}</span>
-          <span className="text-sm text-brand-charcoal/50 ml-1">filtered</span>
+          <span className="text-sm text-brand-charcoal/50 ml-1">filtered out</span>
         </div>
       </div>
       <div className="h-3 bg-brand-pink-light rounded-full overflow-hidden">
@@ -112,34 +112,74 @@ function VibeCheckBar({ approved, filtered }) {
         />
       </div>
       <p className="mt-2 text-xs text-brand-charcoal/40">
-        {total > 0 ? `${approvedPct.toFixed(0)}% conversion rate` : 'No leads yet'} — your gatekeeper is working
+        {total > 0 ? `${approvedPct.toFixed(0)}% acquisition rate` : 'Leads incoming'} — the Gatekeeper is protecting your calendar
       </p>
+
+      {/* Funnel breakdown */}
+      <div className="mt-4 pt-4 border-t border-brand-pink/10 space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-brand-charcoal/20" />
+            <span className="text-brand-charcoal/60">Leads found by Hunter</span>
+          </div>
+          <span className="font-medium text-brand-charcoal">{total}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-brand-pink-dark" />
+            <span className="text-brand-charcoal/60">Filtered by Gatekeeper</span>
+          </div>
+          <span className="font-medium text-brand-charcoal">{filtered}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-brand-gold" />
+            <span className="text-brand-charcoal/60">Booked & deposited</span>
+          </div>
+          <span className="font-medium text-brand-charcoal">{approved}</span>
+        </div>
+      </div>
     </div>
   )
 }
 
-// ── Activity Feed ───────────────────────────────────────────────────
+// ── Growth Feed ─────────────────────────────────────────────────────
 
-function ActivityFeed() {
+function GrowthFeed({ metrics }) {
   const activities = [
-    { time: 'Just now', text: 'Dashboard loaded — all systems active', type: 'booking' },
+    { time: 'Active', text: 'Social Hunter scanning for local leads', type: 'hunter', icon: '🎯' },
+    { time: 'Active', text: 'Gatekeeper screening inbound DMs', type: 'gatekeeper', icon: '🛡️' },
+    { time: 'Active', text: 'Revenue Engine queuing upsell texts', type: 'revenue', icon: '💰' },
   ]
+
+  // Add dynamic entries based on real metrics
+  if (metrics.leads_approved > 0) {
+    activities.push({ time: 'Recent', text: `${metrics.leads_approved} new clients acquired by AI`, type: 'revenue', icon: '✅' })
+  }
+  if (metrics.found_money > 0) {
+    activities.push({ time: 'Recent', text: `$${metrics.found_money} in found money from upsells`, type: 'revenue', icon: '💵' })
+  }
+  if (metrics.gap_fills > 0) {
+    activities.push({ time: 'Recent', text: `${metrics.gap_fills} cancelled slots recovered`, type: 'gatekeeper', icon: '📅' })
+  }
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm border border-brand-pink/20">
       <h3 className="text-sm font-medium text-brand-charcoal/60 uppercase tracking-wide mb-4">
-        Recent Activity
+        AI Growth Activity
       </h3>
       <div className="space-y-3">
         {activities.map((a, i) => (
           <div key={i} className="flex items-center gap-3">
-            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-              a.type === 'revenue' ? 'bg-brand-gold' :
-              a.type === 'filter' ? 'bg-brand-pink-dark' :
-              a.type === 'gap' ? 'bg-emerald-500' : 'bg-blue-500'
-            }`} />
+            <span className="text-base flex-shrink-0">{a.icon}</span>
             <span className="text-sm text-brand-charcoal/80 flex-1">{a.text}</span>
-            <span className="text-xs text-brand-charcoal/40 flex-shrink-0">{a.time}</span>
+            <span className={`text-xs flex-shrink-0 px-2 py-0.5 rounded-full font-medium ${
+              a.time === 'Active'
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-brand-gold/10 text-brand-gold-dark'
+            }`}>
+              {a.time}
+            </span>
           </div>
         ))}
       </div>
@@ -181,13 +221,13 @@ export default function Dashboard() {
               Beauty <span className="text-brand-gold">OS</span>
             </h1>
             <p className="text-xs text-brand-charcoal/40 tracking-wide uppercase">
-              {slug ? slug.replace(/-/g, ' ') : 'Studio Dashboard'}
+              {slug ? slug.replace(/-/g, ' ') : 'Growth Dashboard'}
             </p>
           </Link>
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              All Systems Active
+              AI Hunting for Clients
             </span>
           </div>
         </div>
@@ -198,46 +238,46 @@ export default function Dashboard() {
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           <StatCard
+            icon={<UsersIcon />}
+            label="New Clients Acquired"
+            value={metrics.leads_approved}
+            subtext="Found, screened, and booked by AI"
+            accent
+          />
+          <StatCard
             icon={<DollarIcon />}
-            label="Found Money"
+            label="Total Found Money"
             value={`$${metrics.found_money.toLocaleString()}`}
-            subtext="Revenue from automated upsells"
+            subtext="Upsell revenue you didn't have to sell"
             accent
           />
           <StatCard
             icon={<ClockIcon />}
             label="Hours Reclaimed"
             value={`${metrics.hours_reclaimed}h`}
-            subtext={`${metrics.ai_chats} AI-handled conversations`}
+            subtext={`${metrics.ai_chats} conversations handled by AI`}
           />
           <StatCard
-            icon={<ShieldIcon />}
-            label="Leads Screened"
-            value={metrics.leads_approved + metrics.leads_filtered}
-            subtext={`${metrics.leads_filtered} filtered out by Vibe Check`}
-          />
-          <StatCard
-            icon={<CalendarIcon />}
-            label="Gaps Filled"
-            value={metrics.gap_fills}
-            subtext="Cancelled slots recovered from waitlist"
-            accent
+            icon={<TrendingUpIcon />}
+            label="Growth Actions"
+            value={metrics.leads_approved + metrics.leads_filtered + metrics.gap_fills}
+            subtext={`${metrics.gap_fills} cancelled slots recovered`}
           />
         </div>
 
         {/* Charts & Details Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <VibeCheckBar
+          <AcquisitionFunnel
             approved={metrics.leads_approved}
             filtered={metrics.leads_filtered}
           />
-          <ActivityFeed />
+          <GrowthFeed metrics={metrics} />
         </div>
 
         {/* Footer */}
         <div className="mt-12 text-center">
           <p className="text-xs text-brand-charcoal/30">
-            Beauty OS — Your AI studio manager, working 24/7 so you don't have to.
+            Beauty OS — Finding, screening, and booking your clients 24/7 so you can focus on your craft.
           </p>
         </div>
       </main>

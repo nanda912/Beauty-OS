@@ -172,10 +172,10 @@ function AddOnsStep({ services, onNext, onBack }) {
   return (
     <div>
       <h2 className="text-2xl font-display font-bold text-brand-charcoal mb-2">
-        Upsell Add-Ons
+        Found Money Add-Ons
       </h2>
       <p className="text-brand-charcoal/50 mb-6">
-        Add quick add-ons to each service. These are what the AI pitches via text 24h before appointments.
+        Add high-margin upsells to each service. The Revenue Engine texts clients 24h before their appointment with a cheeky pitch — turning a $65 wax into an $80 ticket automatically.
       </p>
 
       {/* Service selector */}
@@ -486,7 +486,7 @@ function LiveDemoStep({ onBack }) {
   const studioName = localStorage.getItem('beautyos_studio_name') || 'Your Studio'
 
   const [messages, setMessages] = useState([
-    { role: 'system', text: `Hi! I'm the AI assistant for ${studioName}. Try sending me a message like a real client would!` },
+    { role: 'system', text: `Hi! I'm the AI Gatekeeper for ${studioName}. When the Social Hunter finds a lead, I screen them like this. Try sending a message as if you were a potential client!` },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -540,10 +540,10 @@ function LiveDemoStep({ onBack }) {
   return (
     <div>
       <h2 className="text-2xl font-display font-bold text-brand-charcoal mb-2">
-        Test Your AI Assistant
+        See Your AI in Action
       </h2>
       <p className="text-brand-charcoal/50 mb-4">
-        Send a message like a real client would. The AI uses YOUR services, policies, and brand voice.
+        This is how the Gatekeeper screens leads the Social Hunter finds. It uses YOUR services, policies, and brand voice. Try it!
       </p>
 
       {/* Example prompts */}
@@ -623,7 +623,7 @@ function LiveDemoStep({ onBack }) {
           disabled={finishing}
           className="flex-1 py-3 bg-brand-gold text-white rounded-xl font-semibold hover:bg-brand-gold-dark transition disabled:opacity-50"
         >
-          {finishing ? 'Setting up...' : 'Finish & Go to Dashboard →'}
+          {finishing ? 'Activating...' : 'Activate & Start Growing →'}
         </button>
       </div>
     </div>
