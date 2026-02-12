@@ -9,6 +9,6 @@ COPY backend/ backend/
 COPY config/ config/
 COPY run.py .
 
-EXPOSE 8000
+EXPOSE ${PORT:-8000}
 
-CMD ["uvicorn", "backend.server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD uvicorn backend.server:app --host 0.0.0.0 --port ${PORT:-8000}

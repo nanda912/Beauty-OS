@@ -19,7 +19,12 @@ app = FastAPI(title="Beauty OS", version="1.0.0")
 # Allow the React dashboard to connect
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://beauty-os.vercel.app",
+        "https://web-production-8369d9.up.railway.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
