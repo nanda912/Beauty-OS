@@ -1,20 +1,38 @@
 """
-Beauty OS — FastAPI Server
+Beauty OS — FastAPI Server (Multi-Tenant)
 
-Central API that connects all agents, webhooks, and the dashboard.
+Central API that connects all agents, webhooks, onboarding, and the dashboard.
 """
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
-from backend.database import init_db, get_dashboard_metrics
+from backend.database import (
+    init_db,
+    get_dashboard_metrics,
+    create_studio,
+    get_studio_by_slug,
+    get_default_studio,
+    update_studio,
+    create_service,
+    get_services_for_studio,
+    update_service,
+    delete_service,
+    create_addon,
+    get_addons_for_service,
+    get_addons_for_studio,
+    update_addon,
+    delete_addon,
+)
+from backend.auth import get_current_studio, get_optional_studio
+from backend.studio_config import get_studio_config, BRAND_VOICE_PROMPTS
 from backend.agents.vibe_check import evaluate_lead, evaluate_policy_confirmation
 from backend.agents.revenue_engine import process_upsell_window, handle_upsell_reply
 from backend.agents.gap_filler import handle_cancellation, handle_gap_fill_reply
 
-app = FastAPI(title="Beauty OS", version="1.0.0")
+app = FastAPI(title="Beauty OS", version="2.0.0")
 
 # Allow the React dashboard to connect
 app.add_middleware(
@@ -43,12 +61,260 @@ def health():
     return {"status": "ok", "service": "beauty-os"}
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# ONBOARDING API — No auth required (this IS how they get their API key)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+# ── Step 1: Register Studio ──────────────────────────────────────────
+
+class RegisterStudioRequest(BaseModel):
+    name: str
+    owner_name: str
+    phone: str = ""
+    ig_handle: str = ""
+
+
+@app.post("/api/onboarding/register")
+def register_studio(req: RegisterStudioRequest):
+    """Create a new studio and return its slug + API key."""
+    if not req.name.strip():
+        raise HTTPException(400, "Studio name is required")
+    if not req.owner_name.strip():
+        raise HTTPException(400, "Owner name is required")
+
+    result = create_studio(
+        name=req.name.strip(),
+        owner_name=req.owner_name.strip(),
+        phone=req.phone.strip(),
+        ig_handle=req.ig_handle.strip(),
+    )
+    return result
+
+
+# ── Step 2: Services CRUD ────────────────────────────────────────────
+
+class AddServiceRequest(BaseModel):
+    name: str
+    price: float
+    duration_min: int
+
+
+class UpdateServiceRequest(BaseModel):
+    name: Optional[str] = None
+    price: Optional[float] = None
+    duration_min: Optional[int] = None
+
+
+@app.post("/api/onboarding/services")
+def add_service(req: AddServiceRequest, studio: dict = Depends(get_current_studio)):
+    """Add a service to the studio's menu."""
+    service_id = create_service(
+        studio_id=studio["id"],
+        name=req.name.strip(),
+        price=req.price,
+        duration_min=req.duration_min,
+    )
+    return {"id": service_id, "name": req.name, "price": req.price, "duration_min": req.duration_min}
+
+
+@app.get("/api/onboarding/services")
+def list_services(studio: dict = Depends(get_current_studio)):
+    """List all active services for the studio."""
+    return get_services_for_studio(studio["id"])
+
+
+@app.put("/api/onboarding/services/{service_id}")
+def edit_service(service_id: str, req: UpdateServiceRequest, studio: dict = Depends(get_current_studio)):
+    """Update a service."""
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    update_service(service_id, **updates)
+    return {"updated": True}
+
+
+@app.delete("/api/onboarding/services/{service_id}")
+def remove_service(service_id: str, studio: dict = Depends(get_current_studio)):
+    """Delete a service and its add-ons."""
+    delete_service(service_id)
+    return {"deleted": True}
+
+
+# ── Step 3: Add-Ons CRUD ────────────────────────────────────────────
+
+class AddAddonRequest(BaseModel):
+    service_id: str
+    name: str
+    price: float
+    duration_min: int
+    pitch: str = ""
+
+
+class UpdateAddonRequest(BaseModel):
+    name: Optional[str] = None
+    price: Optional[float] = None
+    duration_min: Optional[int] = None
+    pitch: Optional[str] = None
+
+
+@app.post("/api/onboarding/addons")
+def add_addon(req: AddAddonRequest, studio: dict = Depends(get_current_studio)):
+    """Add an add-on to a service."""
+    addon_id = create_addon(
+        service_id=req.service_id,
+        studio_id=studio["id"],
+        name=req.name.strip(),
+        price=req.price,
+        duration_min=req.duration_min,
+        pitch=req.pitch.strip(),
+    )
+    return {"id": addon_id, "name": req.name, "price": req.price}
+
+
+@app.get("/api/onboarding/addons/{service_id}")
+def list_addons(service_id: str, studio: dict = Depends(get_current_studio)):
+    """List all add-ons for a specific service."""
+    return get_addons_for_service(service_id)
+
+
+@app.put("/api/onboarding/addons/{addon_id}")
+def edit_addon(addon_id: str, req: UpdateAddonRequest, studio: dict = Depends(get_current_studio)):
+    """Update an add-on."""
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    update_addon(addon_id, **updates)
+    return {"updated": True}
+
+
+@app.delete("/api/onboarding/addons/{addon_id}")
+def remove_addon(addon_id: str, studio: dict = Depends(get_current_studio)):
+    """Delete an add-on."""
+    delete_addon(addon_id)
+    return {"deleted": True}
+
+
+# ── Step 4: Policies ─────────────────────────────────────────────────
+
+class PoliciesRequest(BaseModel):
+    deposit_amount: Optional[float] = None
+    late_fee: Optional[float] = None
+    cancel_window_hours: Optional[int] = None
+    booking_url: Optional[str] = None
+
+
+@app.put("/api/onboarding/policies")
+def set_policies(req: PoliciesRequest, studio: dict = Depends(get_current_studio)):
+    """Update studio policies."""
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    update_studio(studio["id"], **updates)
+    return {"updated": True}
+
+
+@app.get("/api/onboarding/policies")
+def get_policies(studio: dict = Depends(get_current_studio)):
+    """Get current studio policies."""
+    return {
+        "deposit_amount": studio["deposit_amount"],
+        "late_fee": studio["late_fee"],
+        "cancel_window_hours": studio["cancel_window_hours"],
+        "booking_url": studio["booking_url"],
+    }
+
+
+# ── Step 5: Brand Voice ─────────────────────────────────────────────
+
+class BrandVoiceRequest(BaseModel):
+    brand_voice: str  # "professional_chill" | "warm_bubbly" | "luxury_exclusive"
+
+
+@app.get("/api/onboarding/brand-voices")
+def list_brand_voices():
+    """Return available brand voice presets."""
+    return [
+        {"key": key, "label": val["label"], "personality": val["personality"][:100] + "..."}
+        for key, val in BRAND_VOICE_PROMPTS.items()
+    ]
+
+
+@app.put("/api/onboarding/brand-voice")
+def set_brand_voice(req: BrandVoiceRequest, studio: dict = Depends(get_current_studio)):
+    """Set the studio's brand voice."""
+    if req.brand_voice not in BRAND_VOICE_PROMPTS:
+        raise HTTPException(400, f"Invalid voice. Choose from: {list(BRAND_VOICE_PROMPTS.keys())}")
+    update_studio(studio["id"], brand_voice=req.brand_voice)
+    return {"updated": True, "brand_voice": req.brand_voice}
+
+
+# ── Step 6: Complete Onboarding ──────────────────────────────────────
+
+@app.post("/api/onboarding/complete")
+def complete_onboarding(studio: dict = Depends(get_current_studio)):
+    """Mark onboarding as complete."""
+    update_studio(studio["id"], onboarding_complete=1)
+    return {"onboarding_complete": True, "slug": studio["slug"]}
+
+
+# ── Studio Config (public by slug) ──────────────────────────────────
+
+@app.get("/api/studio/{slug}")
+def get_studio_public(slug: str):
+    """Get public studio info by slug (for the onboarding wizard)."""
+    studio = get_studio_by_slug(slug)
+    if not studio:
+        raise HTTPException(404, "Studio not found")
+    # Return non-sensitive fields only
+    return {
+        "name": studio["name"],
+        "slug": studio["slug"],
+        "owner_name": studio["owner_name"],
+        "ig_handle": studio["ig_handle"],
+        "brand_voice": studio["brand_voice"],
+        "onboarding_complete": bool(studio["onboarding_complete"]),
+    }
+
+
+# ── Live Demo ────────────────────────────────────────────────────────
+
+class DemoRequest(BaseModel):
+    message: str
+    sender_name: str = "Demo User"
+
+
+@app.post("/api/onboarding/demo")
+def run_demo(req: DemoRequest, studio: dict = Depends(get_current_studio)):
+    """
+    Run a dry-run Vibe Check using the studio's real config.
+    No client records are created. Perfect for the onboarding demo step.
+    """
+    result = evaluate_lead(
+        message=req.message,
+        sender_name=req.sender_name,
+        sender_ig="demo_user",
+        studio_id=studio["id"],
+        dry_run=True,
+    )
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# EXISTING ENDPOINTS — Now multi-tenant aware
+# ═══════════════════════════════════════════════════════════════════════
+
+
 # ── Dashboard Metrics ────────────────────────────────────────────────
 
 @app.get("/api/dashboard")
-def dashboard():
+def dashboard(studio: dict = Depends(get_optional_studio)):
     """Return aggregated metrics for the owner dashboard."""
-    return get_dashboard_metrics()
+    studio_id = studio["id"] if studio else ""
+    return get_dashboard_metrics(studio_id)
+
+
+@app.get("/api/dashboard/{slug}")
+def dashboard_by_slug(slug: str):
+    """Return dashboard metrics for a specific studio by slug."""
+    studio = get_studio_by_slug(slug)
+    if not studio:
+        raise HTTPException(404, "Studio not found")
+    return get_dashboard_metrics(studio["id"])
 
 
 # ── Vibe Check Endpoints ─────────────────────────────────────────────
@@ -65,22 +331,26 @@ class PolicyConfirmation(BaseModel):
 
 
 @app.post("/api/vibe-check")
-def vibe_check(lead: LeadMessage):
+def vibe_check(lead: LeadMessage, studio: dict = Depends(get_optional_studio)):
     """Evaluate a new lead (e.g., from Instagram DM webhook)."""
+    studio_id = studio["id"] if studio else ""
     result = evaluate_lead(
         message=lead.message,
         sender_name=lead.sender_name,
         sender_ig=lead.sender_ig,
+        studio_id=studio_id,
     )
     return result
 
 
 @app.post("/api/vibe-check/confirm")
-def vibe_check_confirm(confirmation: PolicyConfirmation):
+def vibe_check_confirm(confirmation: PolicyConfirmation, studio: dict = Depends(get_optional_studio)):
     """Evaluate a policy confirmation reply."""
+    studio_id = studio["id"] if studio else ""
     result = evaluate_policy_confirmation(
         client_id=confirmation.client_id,
         message=confirmation.message,
+        studio_id=studio_id,
     )
     return result
 
@@ -93,21 +363,21 @@ class UpsellReply(BaseModel):
 
 
 @app.post("/api/upsell/process")
-def run_upsell_cycle():
-    """
-    Trigger the upsell cycle manually (or call from scheduler).
-    Finds all bookings in the 24h window and sends upsell SMS.
-    """
-    results = process_upsell_window()
+def run_upsell_cycle(studio: dict = Depends(get_optional_studio)):
+    """Trigger the upsell cycle manually."""
+    studio_id = studio["id"] if studio else ""
+    results = process_upsell_window(studio_id=studio_id)
     return {"upsells_sent": len(results), "details": results}
 
 
 @app.post("/api/upsell/reply")
-def upsell_reply(reply: UpsellReply):
+def upsell_reply(reply: UpsellReply, studio: dict = Depends(get_optional_studio)):
     """Handle an inbound SMS reply to an upsell offer."""
+    studio_id = studio["id"] if studio else ""
     result = handle_upsell_reply(
         booking_id=reply.booking_id,
         reply_text=reply.reply_text,
+        studio_id=studio_id,
     )
     return result
 
@@ -130,26 +400,30 @@ class GapFillReply(BaseModel):
 
 
 @app.post("/api/gap-fill/cancel")
-def gap_fill_cancel(event: CancellationEvent):
+def gap_fill_cancel(event: CancellationEvent, studio: dict = Depends(get_optional_studio)):
     """Process a booking cancellation and notify the waitlist."""
+    studio_id = studio["id"] if studio else ""
     result = handle_cancellation(
         booking_id=event.booking_id,
         service=event.service,
         scheduled_at=event.scheduled_at,
         original_price=event.original_price,
+        studio_id=studio_id,
     )
     return result
 
 
 @app.post("/api/gap-fill/reply")
-def gap_fill_reply(reply: GapFillReply):
+def gap_fill_reply(reply: GapFillReply, studio: dict = Depends(get_optional_studio)):
     """Handle an inbound SMS reply from a waitlisted client."""
+    studio_id = studio["id"] if studio else ""
     result = handle_gap_fill_reply(
         client_id=reply.client_id,
         service=reply.service,
         scheduled_at=reply.scheduled_at,
         price=reply.price,
         reply_text=reply.reply_text,
+        studio_id=studio_id,
     )
     return result
 
@@ -165,8 +439,6 @@ async def twilio_inbound(request: Request):
     form = await request.form()
     from_number = form.get("From", "")
     body = form.get("Body", "")
-    # In production, look up the pending context for this phone number
-    # to determine if this is an upsell reply or gap-fill reply.
     return {"received": True, "from": from_number, "body": body}
 
 
@@ -174,11 +446,8 @@ async def twilio_inbound(request: Request):
 
 @app.post("/webhooks/instagram")
 async def instagram_webhook(request: Request):
-    """
-    Instagram sends webhook events here for new DMs.
-    """
+    """Instagram sends webhook events here for new DMs."""
     payload = await request.json()
-    # Extract message from Instagram webhook payload
     entries = payload.get("entry", [])
     for entry in entries:
         messaging = entry.get("messaging", [])
@@ -191,7 +460,6 @@ async def instagram_webhook(request: Request):
                     sender_name="Instagram User",
                     sender_ig=sender_id,
                 )
-                # In production, send the draft_reply back via Instagram API
     return {"status": "ok"}
 
 
@@ -201,7 +469,6 @@ async def instagram_webhook_verify(request: Request):
     mode = request.query_params.get("hub.mode")
     token = request.query_params.get("hub.verify_token")
     challenge = request.query_params.get("hub.challenge")
-    # Verify against your configured verify token
     if mode == "subscribe" and token:
         return int(challenge)
     raise HTTPException(status_code=403, detail="Verification failed")
