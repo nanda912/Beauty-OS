@@ -9,7 +9,4 @@ COPY backend/ backend/
 COPY config/ config/
 COPY run.py .
 
-ENV PORT 8000
-
-SHELL ["/bin/bash", "-c"]
-CMD exec uvicorn backend.server:app --host 0.0.0.0 --port $PORT
+CMD ["python", "run.py"]
