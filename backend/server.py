@@ -30,6 +30,7 @@ from backend.database import (
     create_magic_token,
     validate_magic_token,
     cleanup_expired_tokens,
+    get_social_leads,
 )
 from backend.auth import get_current_studio, get_optional_studio
 from backend.studio_config import get_studio_config, BRAND_VOICE_PROMPTS
@@ -37,6 +38,7 @@ from backend.services.email import send_magic_link
 from backend.agents.vibe_check import evaluate_lead, evaluate_policy_confirmation
 from backend.agents.revenue_engine import process_upsell_window, handle_upsell_reply
 from backend.agents.gap_filler import handle_cancellation, handle_gap_fill_reply
+from backend.agents.social_hunter import run_social_hunter, approve_and_reply, dismiss_lead
 
 app = FastAPI(title="Beauty OS", version="2.0.0")
 
@@ -509,6 +511,59 @@ def gap_fill_reply(reply: GapFillReply, studio: dict = Depends(get_optional_stud
         reply_text=reply.reply_text,
         studio_id=studio_id,
     )
+    return result
+
+
+# ── Social Hunter Endpoints ─────────────────────────────────────────
+
+class SocialHunterRunRequest(BaseModel):
+    subreddits: Optional[List[str]] = None
+    keywords: Optional[List[str]] = None
+    dry_run: bool = True
+
+
+@app.get("/api/social-leads")
+def list_social_leads(
+    status: str = "",
+    limit: int = 50,
+    studio: dict = Depends(get_current_studio),
+):
+    """List social leads found by the Social Hunter."""
+    return get_social_leads(studio["id"], status=status, limit=limit)
+
+
+@app.post("/api/social-leads/{lead_id}/approve")
+def approve_social_lead(lead_id: str, studio: dict = Depends(get_current_studio)):
+    """Approve a social lead and post the drafted reply to Reddit."""
+    result = approve_and_reply(lead_id, studio_id=studio["id"])
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result
+
+
+@app.post("/api/social-leads/{lead_id}/dismiss")
+def dismiss_social_lead(lead_id: str, studio: dict = Depends(get_current_studio)):
+    """Dismiss a social lead (don't reply)."""
+    result = dismiss_lead(lead_id, studio_id=studio["id"])
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result
+
+
+@app.post("/api/social-hunter/run")
+def trigger_social_hunter(
+    req: SocialHunterRunRequest,
+    studio: dict = Depends(get_current_studio),
+):
+    """Manually trigger a Social Hunter scan for this studio."""
+    result = run_social_hunter(
+        studio_id=studio["id"],
+        dry_run=req.dry_run,
+        subreddits=req.subreddits,
+        keywords=req.keywords,
+    )
+    if "error" in result:
+        raise HTTPException(400, result["error"])
     return result
 
 

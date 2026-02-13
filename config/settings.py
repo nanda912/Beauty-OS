@@ -48,3 +48,10 @@ STUDIO_VIBE = os.getenv("STUDIO_VIBE", "professional, particular, chill")
 # ── Email (Magic Link Auth) ─────────────────────────────────────────
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://beauty-os.vercel.app")
+
+# ── Reddit (Social Hunter) ─────────────────────────────────────────
+REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")
+REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
+REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "BeautyOS:v1.0 (by /u/beautyos_bot)")
+REDDIT_USERNAME = os.getenv("REDDIT_USERNAME", "")
+REDDIT_PASSWORD = os.getenv("REDDIT_PASSWORD", "")

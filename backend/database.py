@@ -160,7 +160,7 @@ def init_db():
                 id          TEXT PRIMARY KEY,
                 studio_id   TEXT REFERENCES studios(id),
                 agent       TEXT NOT NULL
-                                CHECK(agent IN ('vibe_check','revenue','gap_filler','system')),
+                                CHECK(agent IN ('vibe_check','revenue','gap_filler','social_hunter','system')),
                 action      TEXT NOT NULL,
                 metadata    TEXT DEFAULT '{}',
                 created_at  TEXT DEFAULT (datetime('now'))
@@ -176,10 +176,34 @@ def init_db():
                 used        INTEGER DEFAULT 0,
                 created_at  TEXT DEFAULT (datetime('now'))
             );
+
+            -- ── Social Leads (Social Hunter) ─────────────────────
+            CREATE TABLE IF NOT EXISTS social_leads (
+                id              TEXT PRIMARY KEY,
+                studio_id       TEXT NOT NULL REFERENCES studios(id),
+                platform        TEXT NOT NULL DEFAULT 'reddit'
+                                    CHECK(platform IN ('reddit','instagram','twitter')),
+                post_id         TEXT NOT NULL,
+                post_url        TEXT DEFAULT '',
+                post_title      TEXT DEFAULT '',
+                post_body       TEXT DEFAULT '',
+                subreddit       TEXT DEFAULT '',
+                author          TEXT DEFAULT '',
+                match_score     REAL DEFAULT 0.0,
+                match_reasoning TEXT DEFAULT '',
+                drafted_reply   TEXT DEFAULT '',
+                status          TEXT DEFAULT 'new'
+                                    CHECK(status IN ('new','approved','replied','dismissed','failed')),
+                created_at      TEXT DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_social_leads_studio ON social_leads(studio_id);
+            CREATE INDEX IF NOT EXISTS idx_social_leads_status ON social_leads(studio_id, status);
+            CREATE INDEX IF NOT EXISTS idx_social_leads_post_id ON social_leads(post_id);
         """)
 
     # ── Migrations (safe to re-run) ────────────────────────────────
     _migrate_add_email_column()
+    _migrate_add_social_hunter()
 
     # Seed default studio if none exist
     _seed_default_studio()
@@ -195,6 +219,38 @@ def _migrate_add_email_column():
             db.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_studios_email ON studios(email) WHERE email != ''"
             )
+
+
+def _migrate_add_social_hunter():
+    """Create social_leads table if it doesn't exist yet (for existing databases)."""
+    with get_db() as db:
+        tables = [row[0] for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()]
+        if "social_leads" not in tables:
+            db.executescript("""
+                CREATE TABLE IF NOT EXISTS social_leads (
+                    id              TEXT PRIMARY KEY,
+                    studio_id       TEXT NOT NULL REFERENCES studios(id),
+                    platform        TEXT NOT NULL DEFAULT 'reddit'
+                                        CHECK(platform IN ('reddit','instagram','twitter')),
+                    post_id         TEXT NOT NULL,
+                    post_url        TEXT DEFAULT '',
+                    post_title      TEXT DEFAULT '',
+                    post_body       TEXT DEFAULT '',
+                    subreddit       TEXT DEFAULT '',
+                    author          TEXT DEFAULT '',
+                    match_score     REAL DEFAULT 0.0,
+                    match_reasoning TEXT DEFAULT '',
+                    drafted_reply   TEXT DEFAULT '',
+                    status          TEXT DEFAULT 'new'
+                                        CHECK(status IN ('new','approved','replied','dismissed','failed')),
+                    created_at      TEXT DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_social_leads_studio ON social_leads(studio_id);
+                CREATE INDEX IF NOT EXISTS idx_social_leads_status ON social_leads(studio_id, status);
+                CREATE INDEX IF NOT EXISTS idx_social_leads_post_id ON social_leads(post_id);
+            """)
 
 
 def _seed_default_studio():
@@ -562,6 +618,84 @@ def cleanup_expired_tokens():
         )
 
 
+# ── Social Leads (Social Hunter) ─────────────────────────────────
+
+def save_social_lead(
+    studio_id: str,
+    platform: str,
+    post_id: str,
+    post_url: str = "",
+    post_title: str = "",
+    post_body: str = "",
+    subreddit: str = "",
+    author: str = "",
+    match_score: float = 0.0,
+    match_reasoning: str = "",
+    drafted_reply: str = "",
+    status: str = "new",
+) -> str:
+    """Save a social lead found by the Social Hunter."""
+    lead_id = new_id()
+    with get_db() as db:
+        db.execute(
+            """INSERT INTO social_leads
+               (id, studio_id, platform, post_id, post_url, post_title, post_body,
+                subreddit, author, match_score, match_reasoning, drafted_reply, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (lead_id, studio_id, platform, post_id, post_url, post_title, post_body,
+             subreddit, author, match_score, match_reasoning, drafted_reply, status),
+        )
+    return lead_id
+
+
+def get_social_leads(studio_id: str, status: str = "", limit: int = 50) -> list[dict]:
+    """Get social leads for a studio, optionally filtered by status."""
+    with get_db() as db:
+        if status:
+            rows = db.execute(
+                """SELECT * FROM social_leads
+                   WHERE studio_id=? AND status=?
+                   ORDER BY created_at DESC LIMIT ?""",
+                (studio_id, status, limit),
+            ).fetchall()
+        else:
+            rows = db.execute(
+                """SELECT * FROM social_leads
+                   WHERE studio_id=?
+                   ORDER BY created_at DESC LIMIT ?""",
+                (studio_id, limit),
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_social_lead_by_id(lead_id: str) -> dict | None:
+    """Get a single social lead by its ID."""
+    with get_db() as db:
+        row = db.execute("SELECT * FROM social_leads WHERE id=?", (lead_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def update_social_lead_status(lead_id: str, status: str):
+    """Update the status of a social lead."""
+    with get_db() as db:
+        db.execute(
+            "UPDATE social_leads SET status=? WHERE id=?",
+            (status, lead_id),
+        )
+
+
+def is_post_already_seen(studio_id: str, post_id: str) -> bool:
+    """Check if a Reddit post has already been processed for a studio."""
+    with get_db() as db:
+        count = db.execute(
+            "SELECT COUNT(*) AS c FROM social_leads WHERE studio_id=? AND post_id=?",
+            (studio_id, post_id),
+        ).fetchone()["c"]
+    return count > 0
+
+
+# ── Dashboard metrics (now filterable by studio) ─────────────────────
+
 def get_dashboard_metrics(studio_id: str = "") -> dict:
     with get_db() as db:
         where = "WHERE studio_id=?" if studio_id else ""
@@ -596,6 +730,12 @@ def get_dashboard_metrics(studio_id: str = "") -> dict:
             params,
         ).fetchone()["total"]
 
+        sh_where = f"WHERE studio_id=? AND agent='social_hunter' AND action='lead_found'" if studio_id else "WHERE agent='social_hunter' AND action='lead_found'"
+        social_leads_found = db.execute(
+            f"SELECT COUNT(*) AS total FROM agent_events {sh_where}",
+            params,
+        ).fetchone()["total"]
+
     return {
         "found_money": round(found_money, 2),
         "ai_chats": ai_chats,
@@ -603,4 +743,5 @@ def get_dashboard_metrics(studio_id: str = "") -> dict:
         "leads_approved": approved,
         "leads_filtered": declined,
         "gap_fills": gap_fills,
+        "social_leads_found": social_leads_found,
     }

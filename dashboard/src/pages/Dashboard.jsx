@@ -17,6 +17,7 @@ async function fetchDashboard(slug) {
       leads_approved: 0,
       leads_filtered: 0,
       gap_fills: 0,
+      social_leads_found: 0,
     }
   }
 }
@@ -182,6 +183,15 @@ function eventToDisplay(event) {
   if (event.agent === 'gap_filler' && event.action === 'slot_filled') {
     return { icon: '📅', text: 'Cancelled slot recovered from waitlist', type: 'recovered' }
   }
+  if (event.agent === 'social_hunter' && event.action === 'lead_found') {
+    return { icon: '🎯', text: `Social lead found on r/${meta.subreddit || 'reddit'} (${(meta.match_score * 100).toFixed(0)}% match)`, type: 'social' }
+  }
+  if (event.agent === 'social_hunter' && event.action === 'reply_posted') {
+    return { icon: '💬', text: 'Social reply posted to Reddit', type: 'social' }
+  }
+  if (event.agent === 'social_hunter' && event.action === 'scan_complete') {
+    return { icon: '🔍', text: `Social Hunter scan: ${meta.leads_saved || 0} new leads`, type: 'social' }
+  }
   return { icon: '⚡', text: `${event.agent}: ${event.action}`, type: 'other' }
 }
 
@@ -229,6 +239,176 @@ function GrowthFeed({ metrics }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Social Leads Panel ──────────────────────────────────────────────
+
+function SocialLeadsPanel() {
+  const [leads, setLeads] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('')
+  const [actionLoading, setActionLoading] = useState('')
+
+  useEffect(() => {
+    fetchLeads()
+  }, [filter])
+
+  async function fetchLeads() {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (filter) params.set('status', filter)
+      const res = await fetch(`${API_BASE}/social-leads?${params}`, {
+        headers: { 'X-API-Key': localStorage.getItem('beautyos_api_key') || '' },
+      })
+      if (!res.ok) throw new Error('API error')
+      const data = await res.json()
+      setLeads(data)
+    } catch {
+      setLeads([])
+    }
+    setLoading(false)
+  }
+
+  async function handleApprove(leadId) {
+    setActionLoading(leadId)
+    try {
+      await fetch(`${API_BASE}/social-leads/${leadId}/approve`, {
+        method: 'POST',
+        headers: { 'X-API-Key': localStorage.getItem('beautyos_api_key') || '' },
+      })
+      await fetchLeads()
+    } catch {
+      // silently fail
+    }
+    setActionLoading('')
+  }
+
+  async function handleDismiss(leadId) {
+    setActionLoading(leadId)
+    try {
+      await fetch(`${API_BASE}/social-leads/${leadId}/dismiss`, {
+        method: 'POST',
+        headers: { 'X-API-Key': localStorage.getItem('beautyos_api_key') || '' },
+      })
+      await fetchLeads()
+    } catch {
+      // silently fail
+    }
+    setActionLoading('')
+  }
+
+  const statusColors = {
+    new: 'bg-blue-50 text-blue-700',
+    approved: 'bg-amber-50 text-amber-700',
+    replied: 'bg-emerald-50 text-emerald-700',
+    dismissed: 'bg-gray-100 text-gray-500',
+    failed: 'bg-red-50 text-red-700',
+  }
+
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-sm border border-brand-pink/20">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-medium text-brand-charcoal/60 uppercase tracking-wide">
+          Social Leads
+        </h3>
+        <div className="flex gap-1.5">
+          {['', 'new', 'replied', 'dismissed'].map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
+                filter === f
+                  ? 'bg-brand-charcoal text-white'
+                  : 'bg-brand-pink-light text-brand-charcoal/50 hover:bg-brand-pink'
+              }`}
+            >
+              {f || 'All'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-8 text-brand-charcoal/40">Loading leads...</div>
+      ) : leads.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-brand-charcoal/40 text-sm">No social leads yet.</p>
+          <p className="text-brand-charcoal/30 text-xs mt-1">The Social Hunter scans Reddit every 2 hours.</p>
+        </div>
+      ) : (
+        <div className="space-y-3 max-h-[400px] overflow-y-auto">
+          {leads.map(lead => (
+            <div key={lead.id} className="border border-brand-pink/15 rounded-xl p-4">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-brand-charcoal/40">
+                    r/{lead.subreddit}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[lead.status] || ''}`}>
+                    {lead.status}
+                  </span>
+                  <span className="text-xs text-brand-charcoal/30">
+                    {(lead.match_score * 100).toFixed(0)}% match
+                  </span>
+                </div>
+                <a
+                  href={lead.post_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-brand-gold hover:underline"
+                >
+                  View post
+                </a>
+              </div>
+
+              {/* Post title + snippet */}
+              <p className="text-sm font-medium text-brand-charcoal mb-1">{lead.post_title}</p>
+              <p className="text-xs text-brand-charcoal/50 mb-2 line-clamp-2">
+                {lead.post_body?.slice(0, 200)}
+              </p>
+
+              {/* LLM reasoning */}
+              {lead.match_reasoning && (
+                <p className="text-xs text-brand-charcoal/40 italic mb-2">
+                  AI: {lead.match_reasoning}
+                </p>
+              )}
+
+              {/* Drafted reply */}
+              {lead.drafted_reply && (
+                <div className="bg-brand-gold/5 rounded-lg p-3 mb-3">
+                  <p className="text-xs font-medium text-brand-charcoal/50 mb-1">Drafted Reply:</p>
+                  <p className="text-sm text-brand-charcoal">{lead.drafted_reply}</p>
+                </div>
+              )}
+
+              {/* Actions */}
+              {lead.status === 'new' && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleApprove(lead.id)}
+                    disabled={actionLoading === lead.id}
+                    className="flex-1 py-2 bg-brand-gold text-white rounded-lg text-xs font-medium hover:bg-brand-gold-dark transition disabled:opacity-50"
+                  >
+                    {actionLoading === lead.id ? '...' : 'Approve & Reply'}
+                  </button>
+                  <button
+                    onClick={() => handleDismiss(lead.id)}
+                    disabled={actionLoading === lead.id}
+                    className="flex-1 py-2 border border-brand-pink/30 text-brand-charcoal/50 rounded-lg text-xs font-medium hover:bg-brand-pink-light/50 transition disabled:opacity-50"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -333,6 +513,11 @@ export default function Dashboard() {
             filtered={metrics.leads_filtered}
           />
           <GrowthFeed metrics={metrics} />
+        </div>
+
+        {/* Social Leads Section */}
+        <div className="mt-5">
+          <SocialLeadsPanel />
         </div>
 
         {/* Footer */}
