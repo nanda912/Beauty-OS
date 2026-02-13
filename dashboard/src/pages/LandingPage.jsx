@@ -42,7 +42,7 @@ export default function LandingPage() {
           onClick={() => setShowForm(true)}
           className="px-5 py-2 bg-brand-charcoal text-white rounded-full text-sm font-medium hover:bg-brand-charcoal/90 transition"
         >
-          Start Growing Free
+          Start My Growth Engine
         </button>
       </nav>
 
@@ -55,28 +55,28 @@ export default function LandingPage() {
           </div>
 
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-brand-charcoal leading-tight mb-6">
-            The AI That Finds, Screens, and Books Your Clients —{' '}
-            <span className="text-brand-gold">Working 24/7 While You Work Your Magic</span>
+            The AI That Finds and Books{' '}
+            <span className="text-brand-gold">Your Clients — 24/7</span>
           </h2>
 
           <p className="text-lg text-brand-charcoal/60 mb-10 max-w-2xl mx-auto">
-            Stop chasing clients. Beauty OS hunts high-intent leads on social media,
-            screens them for brand fit, secures deposits, and fills your calendar —
-            all while you focus on your craft.
+            Done chasing DMs and hoping for referrals. Beauty OS listens across social
+            platforms, screens every lead for brand fit, secures deposits, and fills
+            your calendar — so you never market yourself again.
           </p>
 
           <button
             onClick={() => setShowForm(true)}
             className="inline-flex items-center gap-2 px-8 py-4 bg-brand-gold text-white rounded-full text-lg font-semibold hover:bg-brand-gold-dark transition shadow-lg shadow-brand-gold/25"
           >
-            Start Growing for Free
+            Start My Growth Engine
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
           </button>
 
           <p className="mt-4 text-sm text-brand-charcoal/40">
-            Set up in 5 minutes. No marketing experience needed.
+            5-minute setup. No marketing experience needed.
           </p>
         </div>
 
@@ -85,7 +85,7 @@ export default function LandingPage() {
           {[
             {
               title: 'The Social Hunter',
-              desc: 'Your 24/7 marketing department. Scans Instagram, Nextdoor, and Reddit for local high-intent leads and starts a booking conversation immediately.',
+              desc: 'High-frequency social listening across Instagram, Nextdoor, and Reddit. Spots ready-to-buy locals, starts a conversation, and moves them from social post to paid deposit — all before you wake up.',
               icon: '🎯',
               tag: 'NEW CLIENTS',
             },
@@ -129,7 +129,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto">
             {[
               { step: '1', title: 'Set Up Your Studio', desc: 'Add your services, prices, policies, and pick your brand voice.' },
-              { step: '2', title: 'AI Starts Hunting', desc: 'The Social Hunter finds leads on Instagram, Nextdoor, and Reddit — then the Gatekeeper screens them.' },
+              { step: '2', title: 'AI Starts Listening', desc: 'The Social Hunter scans Instagram, Nextdoor, and Reddit for ready-to-buy locals — the Gatekeeper screens them instantly.' },
               { step: '3', title: 'Watch Your Calendar Fill', desc: 'Qualified, deposit-secured clients show up. You just do what you love.' },
             ].map((s) => (
               <div key={s.step} className="text-center">
@@ -149,7 +149,7 @@ export default function LandingPage() {
             onClick={() => setShowForm(true)}
             className="inline-flex items-center gap-2 px-8 py-4 bg-brand-charcoal text-white rounded-full text-lg font-semibold hover:bg-brand-charcoal/90 transition"
           >
-            Start Growing for Free
+            Start My Growth Engine
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
@@ -230,7 +230,7 @@ export default function LandingPage() {
                 disabled={loading}
                 className="w-full py-3 bg-brand-gold text-white rounded-xl font-semibold hover:bg-brand-gold-dark transition disabled:opacity-50"
               >
-                {loading ? 'Creating...' : 'Start Growing for Free'}
+                {loading ? 'Creating...' : 'Start My Growth Engine'}
               </button>
             </form>
           </div>

@@ -486,7 +486,7 @@ function LiveDemoStep({ onBack }) {
   const studioName = localStorage.getItem('beautyos_studio_name') || 'Your Studio'
 
   const [messages, setMessages] = useState([
-    { role: 'system', text: `Hi! I'm the AI Gatekeeper for ${studioName}. When the Social Hunter finds a lead, I screen them like this. Try sending a message as if you were a potential client!` },
+    { role: 'system', text: `Hi! I'm the AI Gatekeeper for ${studioName}. When the Social Hunter spots a ready-to-buy lead, I screen them like this. Try sending a message as a potential client!` },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -543,7 +543,7 @@ function LiveDemoStep({ onBack }) {
         See Your AI in Action
       </h2>
       <p className="text-brand-charcoal/50 mb-4">
-        This is how the Gatekeeper screens leads the Social Hunter finds. It uses YOUR services, policies, and brand voice. Try it!
+        The Social Hunter listens across social platforms and sends leads here. The Gatekeeper screens them using YOUR services, policies, and voice. Try it!
       </p>
 
       {/* Example prompts */}

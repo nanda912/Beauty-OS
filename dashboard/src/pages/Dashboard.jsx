@@ -147,7 +147,7 @@ function AcquisitionFunnel({ approved, filtered }) {
 
 function GrowthFeed({ metrics }) {
   const activities = [
-    { time: 'Active', text: 'Social Hunter scanning for local leads', type: 'hunter', icon: '🎯' },
+    { time: 'Active', text: 'Social Hunter listening for ready-to-buy locals', type: 'hunter', icon: '🎯' },
     { time: 'Active', text: 'Gatekeeper screening inbound DMs', type: 'gatekeeper', icon: '🛡️' },
     { time: 'Active', text: 'Revenue Engine queuing upsell texts', type: 'revenue', icon: '💰' },
   ]
@@ -277,7 +277,7 @@ export default function Dashboard() {
         {/* Footer */}
         <div className="mt-12 text-center">
           <p className="text-xs text-brand-charcoal/30">
-            Beauty OS — Finding, screening, and booking your clients 24/7 so you can focus on your craft.
+            Beauty OS — Your AI finds and books clients 24/7 so you never market yourself again.
           </p>
         </div>
       </main>
