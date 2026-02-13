@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 
 const API_BASE = '/api'
 
@@ -7,17 +7,24 @@ export default function LandingPage() {
   const navigate = useNavigate()
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ name: '', owner_name: '', phone: '', ig_handle: '' })
+  const [form, setForm] = useState({ name: '', owner_name: '', email: '', phone: '', ig_handle: '' })
+  const [regError, setRegError] = useState('')
 
   async function handleRegister(e) {
     e.preventDefault()
     setLoading(true)
+    setRegError('')
     try {
       const res = await fetch(`${API_BASE}/onboarding/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
+      if (res.status === 409) {
+        setRegError('An account with this email already exists.')
+        setLoading(false)
+        return
+      }
       if (!res.ok) throw new Error('Registration failed')
       const data = await res.json()
       localStorage.setItem('beautyos_api_key', data.api_key)
@@ -25,7 +32,7 @@ export default function LandingPage() {
       localStorage.setItem('beautyos_studio_name', data.name)
       navigate(`/onboard/${data.slug}`)
     } catch (err) {
-      alert('Something went wrong. Please try again.')
+      setRegError('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -38,12 +45,20 @@ export default function LandingPage() {
         <h1 className="text-2xl font-display font-bold text-brand-charcoal">
           Beauty <span className="text-brand-gold">OS</span>
         </h1>
-        <button
-          onClick={() => setShowForm(true)}
-          className="px-5 py-2 bg-brand-charcoal text-white rounded-full text-sm font-medium hover:bg-brand-charcoal/90 transition"
-        >
-          Start My Growth Engine
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/login"
+            className="px-4 py-2 text-brand-charcoal/60 text-sm font-medium hover:text-brand-charcoal transition"
+          >
+            Sign In
+          </Link>
+          <button
+            onClick={() => setShowForm(true)}
+            className="px-5 py-2 bg-brand-charcoal text-white rounded-full text-sm font-medium hover:bg-brand-charcoal/90 transition"
+          >
+            Start My Growth Engine
+          </button>
+        </div>
       </nav>
 
       {/* Hero */}
@@ -204,6 +219,18 @@ export default function LandingPage() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-brand-charcoal/70 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="you@example.com"
+                  className="w-full px-4 py-3 border border-brand-pink/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-gold/50 focus:border-brand-gold"
+                />
+                <p className="text-xs text-brand-charcoal/40 mt-1">For signing back in later</p>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-brand-charcoal/70 mb-1">Phone</label>
                 <input
                   type="tel"
@@ -225,6 +252,16 @@ export default function LandingPage() {
                 />
               </div>
 
+              {regError && (
+                <p className="text-sm text-red-500">{regError}{' '}
+                  {regError.includes('already exists') && (
+                    <Link to="/login" className="text-brand-gold hover:text-brand-gold-dark font-medium underline">
+                      Sign in here
+                    </Link>
+                  )}
+                </p>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
@@ -232,6 +269,13 @@ export default function LandingPage() {
               >
                 {loading ? 'Creating...' : 'Start My Growth Engine'}
               </button>
+
+              <p className="text-center text-sm text-brand-charcoal/40">
+                Already have an account?{' '}
+                <Link to="/login" className="text-brand-gold hover:text-brand-gold-dark font-medium">
+                  Sign in
+                </Link>
+              </p>
             </form>
           </div>
         </div>

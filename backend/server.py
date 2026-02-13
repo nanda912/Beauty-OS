@@ -15,6 +15,7 @@ from backend.database import (
     get_recent_events,
     create_studio,
     get_studio_by_slug,
+    get_studio_by_email,
     get_default_studio,
     update_studio,
     create_service,
@@ -26,9 +27,13 @@ from backend.database import (
     get_addons_for_studio,
     update_addon,
     delete_addon,
+    create_magic_token,
+    validate_magic_token,
+    cleanup_expired_tokens,
 )
 from backend.auth import get_current_studio, get_optional_studio
 from backend.studio_config import get_studio_config, BRAND_VOICE_PROMPTS
+from backend.services.email import send_magic_link
 from backend.agents.vibe_check import evaluate_lead, evaluate_policy_confirmation
 from backend.agents.revenue_engine import process_upsell_window, handle_upsell_reply
 from backend.agents.gap_filler import handle_cancellation, handle_gap_fill_reply
@@ -53,6 +58,7 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     init_db()
+    cleanup_expired_tokens()
 
 
 # ── Health Check ─────────────────────────────────────────────────────
@@ -60,6 +66,61 @@ def startup():
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "beauty-os"}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# AUTH — Magic Link Login (no auth required)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class MagicLinkRequest(BaseModel):
+    email: str
+
+
+class VerifyTokenRequest(BaseModel):
+    token: str
+
+
+@app.post("/api/auth/send-magic-link")
+def send_magic_link_endpoint(req: MagicLinkRequest):
+    """Send a magic link email to the studio owner."""
+    email = req.email.strip().lower()
+    if not email:
+        raise HTTPException(400, "Email is required")
+
+    studio = get_studio_by_email(email)
+    if not studio:
+        # Don't reveal whether the email exists — always say "check your inbox"
+        return {"sent": True}
+
+    token = create_magic_token(studio["id"])
+    result = send_magic_link(
+        to_email=email,
+        token=token,
+        studio_name=studio["name"],
+    )
+
+    if not result["sent"]:
+        raise HTTPException(500, "Failed to send email. Please try again.")
+
+    return {"sent": True}
+
+
+@app.post("/api/auth/verify-magic-link")
+def verify_magic_link_endpoint(req: VerifyTokenRequest):
+    """Verify a magic link token and return the studio's API key."""
+    if not req.token:
+        raise HTTPException(400, "Token is required")
+
+    result = validate_magic_token(req.token)
+    if not result:
+        raise HTTPException(401, "Invalid or expired link. Please request a new one.")
+
+    return {
+        "api_key": result["api_key"],
+        "slug": result["slug"],
+        "name": result["name"],
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -74,6 +135,7 @@ class RegisterStudioRequest(BaseModel):
     owner_name: str
     phone: str = ""
     ig_handle: str = ""
+    email: str = ""
 
 
 @app.post("/api/onboarding/register")
@@ -84,11 +146,19 @@ def register_studio(req: RegisterStudioRequest):
     if not req.owner_name.strip():
         raise HTTPException(400, "Owner name is required")
 
+    # Check for duplicate email
+    email = req.email.strip().lower()
+    if email:
+        existing = get_studio_by_email(email)
+        if existing:
+            raise HTTPException(409, "An account with this email already exists. Try signing in instead.")
+
     result = create_studio(
         name=req.name.strip(),
         owner_name=req.owner_name.strip(),
         phone=req.phone.strip(),
         ig_handle=req.ig_handle.strip(),
+        email=email,
     )
     return result
 

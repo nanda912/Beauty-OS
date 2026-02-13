@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 
 const API_BASE = '/api'
 
@@ -237,8 +237,16 @@ function GrowthFeed({ metrics }) {
 
 export default function Dashboard() {
   const { slug } = useParams()
+  const navigate = useNavigate()
   const [metrics, setMetrics] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  function signOut() {
+    localStorage.removeItem('beautyos_api_key')
+    localStorage.removeItem('beautyos_slug')
+    localStorage.removeItem('beautyos_studio_name')
+    navigate('/')
+  }
 
   useEffect(() => {
     fetchDashboard(slug).then((data) => {
@@ -275,6 +283,13 @@ export default function Dashboard() {
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
               AI Hunting for Clients
             </span>
+            <button
+              onClick={signOut}
+              className="px-3 py-1 text-xs text-brand-charcoal/40 hover:text-brand-charcoal/70 transition"
+              title="Sign out"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
       </header>

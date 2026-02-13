@@ -9,7 +9,7 @@ import json
 import uuid
 import secrets
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from contextlib import contextmanager
 
@@ -166,10 +166,35 @@ def init_db():
                 created_at  TEXT DEFAULT (datetime('now'))
             );
             CREATE INDEX IF NOT EXISTS idx_events_studio ON agent_events(studio_id);
+
+            -- ── Magic Link Tokens ─────────────────────────────────
+            CREATE TABLE IF NOT EXISTS magic_tokens (
+                id          TEXT PRIMARY KEY,
+                studio_id   TEXT NOT NULL REFERENCES studios(id),
+                token       TEXT UNIQUE NOT NULL,
+                expires_at  TEXT NOT NULL,
+                used        INTEGER DEFAULT 0,
+                created_at  TEXT DEFAULT (datetime('now'))
+            );
         """)
+
+    # ── Migrations (safe to re-run) ────────────────────────────────
+    _migrate_add_email_column()
 
     # Seed default studio if none exist
     _seed_default_studio()
+
+
+def _migrate_add_email_column():
+    """Add email column to studios if it doesn't exist yet."""
+    with get_db() as db:
+        # Check if column exists
+        cols = [row[1] for row in db.execute("PRAGMA table_info(studios)").fetchall()]
+        if "email" not in cols:
+            db.execute("ALTER TABLE studios ADD COLUMN email TEXT DEFAULT ''")
+            db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_studios_email ON studios(email) WHERE email != ''"
+            )
 
 
 def _seed_default_studio():
@@ -190,7 +215,7 @@ def _seed_default_studio():
 
 # ── Studio CRUD ──────────────────────────────────────────────────────
 
-def create_studio(name: str, owner_name: str, phone: str = "", ig_handle: str = "") -> dict:
+def create_studio(name: str, owner_name: str, phone: str = "", ig_handle: str = "", email: str = "") -> dict:
     studio_id = new_id()
     base_slug = _generate_slug(name)
     api_key = _generate_api_key()
@@ -203,9 +228,9 @@ def create_studio(name: str, owner_name: str, phone: str = "", ig_handle: str = 
             slug = f"{base_slug}-{secrets.token_hex(3)}"
 
         db.execute(
-            """INSERT INTO studios (id, slug, api_key, name, owner_name, phone, ig_handle)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (studio_id, slug, api_key, name, owner_name, phone, ig_handle),
+            """INSERT INTO studios (id, slug, api_key, name, owner_name, phone, ig_handle, email)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (studio_id, slug, api_key, name, owner_name, phone, ig_handle, email),
         )
 
     return {"id": studio_id, "slug": slug, "api_key": api_key, "name": name}
@@ -232,7 +257,7 @@ def get_default_studio() -> dict | None:
 def update_studio(studio_id: str, **fields):
     allowed = {"name", "owner_name", "phone", "ig_handle", "brand_voice",
                "deposit_amount", "late_fee", "cancel_window_hours", "booking_url",
-               "onboarding_complete"}
+               "onboarding_complete", "email"}
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
         return
@@ -479,6 +504,62 @@ def get_recent_events(studio_id: str = "", limit: int = 20) -> list[dict]:
         entry["metadata"] = json.loads(entry["metadata"]) if entry["metadata"] else {}
         result.append(entry)
     return result
+
+
+# ── Magic Link Auth ──────────────────────────────────────────────────
+
+def get_studio_by_email(email: str) -> dict | None:
+    """Look up a studio by its owner's email address."""
+    with get_db() as db:
+        row = db.execute(
+            "SELECT * FROM studios WHERE email=? AND email != ''", (email.lower().strip(),)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def create_magic_token(studio_id: str) -> str:
+    """Generate a magic link token with 15-minute expiry. Returns the token string."""
+    token = secrets.token_urlsafe(32)
+    expires_at = (datetime.utcnow() + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
+    with get_db() as db:
+        db.execute(
+            "INSERT INTO magic_tokens (id, studio_id, token, expires_at) VALUES (?, ?, ?, ?)",
+            (new_id(), studio_id, token, expires_at),
+        )
+    return token
+
+
+def validate_magic_token(token: str) -> dict | None:
+    """
+    Check a magic link token. If valid (exists, not used, not expired),
+    mark it used and return the studio dict. Otherwise return None.
+    """
+    with get_db() as db:
+        row = db.execute(
+            """SELECT mt.*, s.api_key, s.slug, s.name AS studio_name, s.id AS sid
+               FROM magic_tokens mt
+               JOIN studios s ON s.id = mt.studio_id
+               WHERE mt.token=? AND mt.used=0 AND mt.expires_at > datetime('now')""",
+            (token,),
+        ).fetchone()
+        if not row:
+            return None
+        # Mark token as used
+        db.execute("UPDATE magic_tokens SET used=1 WHERE id=?", (row["id"],))
+    return {
+        "studio_id": row["sid"],
+        "api_key": row["api_key"],
+        "slug": row["slug"],
+        "name": row["studio_name"],
+    }
+
+
+def cleanup_expired_tokens():
+    """Delete magic tokens that are expired or already used. Safe to call on startup."""
+    with get_db() as db:
+        db.execute(
+            "DELETE FROM magic_tokens WHERE used=1 OR expires_at < datetime('now')"
+        )
 
 
 def get_dashboard_metrics(studio_id: str = "") -> dict:

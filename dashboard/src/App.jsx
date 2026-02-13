@@ -4,6 +4,8 @@ import LandingPage from './pages/LandingPage'
 
 const OnboardingWizard = lazy(() => import('./pages/OnboardingWizard'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const AuthVerify = lazy(() => import('./pages/AuthVerify'))
 
 function PageLoader() {
   return (
@@ -20,6 +22,8 @@ export default function App() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/auth/verify" element={<AuthVerify />} />
         <Route path="/onboard/:slug" element={<OnboardingWizard />} />
         <Route path="/dashboard/:slug" element={<Dashboard />} />
         <Route path="/dashboard" element={<Dashboard />} />

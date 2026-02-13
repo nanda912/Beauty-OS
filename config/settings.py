@@ -44,3 +44,7 @@ BOOKING_URL = os.getenv("BOOKING_URL", "https://yourdomain.com/book")
 # ── Brand Voice ──────────────────────────────────────────────────────
 STUDIO_NAME = os.getenv("STUDIO_NAME", "The Beauty Studio")
 STUDIO_VIBE = os.getenv("STUDIO_VIBE", "professional, particular, chill")
+
+# ── Email (Magic Link Auth) ─────────────────────────────────────────
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://beauty-os.vercel.app")

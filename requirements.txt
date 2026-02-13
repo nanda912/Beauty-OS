@@ -23,3 +23,6 @@ schedule==1.2.2
 
 # Form parsing (for Twilio webhooks)
 python-multipart==0.0.19
+
+# Email (magic link auth)
+resend==2.5.0
