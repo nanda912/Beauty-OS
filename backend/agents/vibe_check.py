@@ -149,7 +149,35 @@ def evaluate_lead(
     )
 
     if dry_run:
+        # Still log the event and create a demo client so the dashboard shows activity
+        demo_client_id = create_client(
+            name=f"{sender_name} (demo)",
+            instagram_handle=sender_ig,
+            studio_id=studio_id,
+        )
+        demo_status = "approved" if result.get("is_approved") and not result.get("requires_policy_confirmation") else (
+            "declined" if not result.get("is_approved") else "pending"
+        )
+        update_client_intake(
+            client_id=demo_client_id,
+            status=demo_status,
+            vibe_score=result.get("vibe_score", 0.0),
+            reasoning=result.get("reasoning", ""),
+        )
+        log_event(
+            agent="vibe_check",
+            action="lead_evaluated",
+            metadata={
+                "client_id": demo_client_id,
+                "is_approved": result.get("is_approved"),
+                "vibe_score": result.get("vibe_score"),
+                "detected_intent": result.get("detected_intent"),
+                "demo": True,
+            },
+            studio_id=studio_id,
+        )
         result["dry_run"] = True
+        result["client_id"] = demo_client_id
         return result
 
     # Create client record

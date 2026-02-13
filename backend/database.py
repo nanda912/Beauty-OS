@@ -458,6 +458,29 @@ def log_event(agent: str, action: str, metadata: dict | None = None, studio_id: 
 
 # ── Dashboard metrics (now filterable by studio) ─────────────────────
 
+def get_recent_events(studio_id: str = "", limit: int = 20) -> list[dict]:
+    """Get recent agent events for the growth activity feed."""
+    with get_db() as db:
+        if studio_id:
+            rows = db.execute(
+                """SELECT id, agent, action, metadata, created_at
+                   FROM agent_events WHERE studio_id=?
+                   ORDER BY created_at DESC LIMIT ?""",
+                (studio_id, limit),
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT id, agent, action, metadata, created_at FROM agent_events ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+    result = []
+    for r in rows:
+        entry = dict(r)
+        entry["metadata"] = json.loads(entry["metadata"]) if entry["metadata"] else {}
+        result.append(entry)
+    return result
+
+
 def get_dashboard_metrics(studio_id: str = "") -> dict:
     with get_db() as db:
         where = "WHERE studio_id=?" if studio_id else ""

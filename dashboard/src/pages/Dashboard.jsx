@@ -145,23 +145,54 @@ function AcquisitionFunnel({ approved, filtered }) {
 
 // ── Growth Feed ─────────────────────────────────────────────────────
 
+function formatEventTime(created_at) {
+  if (!created_at) return ''
+  const date = new Date(created_at + 'Z')
+  const now = new Date()
+  const diffMs = now - date
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'Just now'
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.floor(diffHr / 24)
+  return `${diffDay}d ago`
+}
+
+function eventToDisplay(event) {
+  const meta = event.metadata || {}
+  const score = meta.vibe_score ? `${(meta.vibe_score * 100).toFixed(0)}%` : ''
+
+  if (event.agent === 'vibe_check' && event.action === 'lead_evaluated') {
+    if (meta.is_approved) {
+      return { icon: '✅', text: `Lead approved (${score} vibe) — ${meta.detected_intent || 'inquiry'}`, type: 'approved' }
+    } else {
+      return { icon: '🚫', text: `Lead filtered (${score} vibe) — ${meta.detected_intent || 'screened'}`, type: 'filtered' }
+    }
+  }
+  if (event.agent === 'vibe_check' && event.action === 'policy_confirmed') {
+    return { icon: '🤝', text: 'Client confirmed deposit policy', type: 'approved' }
+  }
+  if (event.agent === 'revenue' && event.action === 'upsell_sent') {
+    return { icon: '💰', text: `Upsell SMS sent — ${meta.addon_name || 'add-on'}`, type: 'revenue' }
+  }
+  if (event.agent === 'revenue' && event.action === 'upsell_accepted') {
+    return { icon: '💵', text: `Upsell accepted! +$${meta.addon_price || ''}`, type: 'revenue' }
+  }
+  if (event.agent === 'gap_filler' && event.action === 'slot_filled') {
+    return { icon: '📅', text: 'Cancelled slot recovered from waitlist', type: 'recovered' }
+  }
+  return { icon: '⚡', text: `${event.agent}: ${event.action}`, type: 'other' }
+}
+
 function GrowthFeed({ metrics }) {
-  const activities = [
-    { time: 'Active', text: 'Social Hunter listening for ready-to-buy locals', type: 'hunter', icon: '🎯' },
-    { time: 'Active', text: 'Gatekeeper screening inbound DMs', type: 'gatekeeper', icon: '🛡️' },
-    { time: 'Active', text: 'Revenue Engine queuing upsell texts', type: 'revenue', icon: '💰' },
+  const statusItems = [
+    { time: 'Active', text: 'Social Hunter listening for ready-to-buy locals', icon: '🎯' },
+    { time: 'Active', text: 'Gatekeeper screening inbound DMs', icon: '🛡️' },
+    { time: 'Active', text: 'Revenue Engine queuing upsell texts', icon: '💰' },
   ]
 
-  // Add dynamic entries based on real metrics
-  if (metrics.leads_approved > 0) {
-    activities.push({ time: 'Recent', text: `${metrics.leads_approved} new clients acquired by AI`, type: 'revenue', icon: '✅' })
-  }
-  if (metrics.found_money > 0) {
-    activities.push({ time: 'Recent', text: `$${metrics.found_money} in found money from upsells`, type: 'revenue', icon: '💵' })
-  }
-  if (metrics.gap_fills > 0) {
-    activities.push({ time: 'Recent', text: `${metrics.gap_fills} cancelled slots recovered`, type: 'gatekeeper', icon: '📅' })
-  }
+  const recentEvents = (metrics.recent_events || []).slice(0, 8)
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm border border-brand-pink/20">
@@ -169,19 +200,34 @@ function GrowthFeed({ metrics }) {
         AI Growth Activity
       </h3>
       <div className="space-y-3">
-        {activities.map((a, i) => (
-          <div key={i} className="flex items-center gap-3">
+        {/* Always-on status items */}
+        {statusItems.map((a, i) => (
+          <div key={`status-${i}`} className="flex items-center gap-3">
             <span className="text-base flex-shrink-0">{a.icon}</span>
             <span className="text-sm text-brand-charcoal/80 flex-1">{a.text}</span>
-            <span className={`text-xs flex-shrink-0 px-2 py-0.5 rounded-full font-medium ${
-              a.time === 'Active'
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-brand-gold/10 text-brand-gold-dark'
-            }`}>
+            <span className="text-xs flex-shrink-0 px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700">
               {a.time}
             </span>
           </div>
         ))}
+
+        {/* Real events from DB */}
+        {recentEvents.length > 0 && (
+          <div className="border-t border-brand-pink/10 pt-3 mt-3 space-y-3">
+            {recentEvents.map((event) => {
+              const display = eventToDisplay(event)
+              return (
+                <div key={event.id} className="flex items-center gap-3">
+                  <span className="text-base flex-shrink-0">{display.icon}</span>
+                  <span className="text-sm text-brand-charcoal/80 flex-1">{display.text}</span>
+                  <span className="text-xs flex-shrink-0 px-2 py-0.5 rounded-full font-medium bg-brand-gold/10 text-brand-gold-dark">
+                    {formatEventTime(event.created_at)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

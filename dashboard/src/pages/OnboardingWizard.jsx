@@ -506,25 +506,34 @@ function LiveDemoStep({ onBack }) {
     setInput('')
     setLoading(true)
 
-    try {
-      const res = await fetch(`${API_BASE}/onboarding/demo`, {
-        method: 'POST',
-        headers: apiHeaders(),
-        body: JSON.stringify({ message: msg, sender_name: 'Demo Client' }),
-      })
-      const data = await res.json()
-      setMessages(prev => [...prev, {
-        role: 'ai',
-        text: data.draft_reply,
-        meta: {
-          vibe_score: data.vibe_score,
-          is_approved: data.is_approved,
-          detected_intent: data.detected_intent,
-        },
-      }])
-    } catch (err) {
-      setMessages(prev => [...prev, { role: 'ai', text: 'Oops — something went wrong. Try again!' }])
+    const maxRetries = 3
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const res = await fetch(`${API_BASE}/onboarding/demo`, {
+          method: 'POST',
+          headers: apiHeaders(),
+          body: JSON.stringify({ message: msg, sender_name: 'Demo Client' }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        setMessages(prev => [...prev, {
+          role: 'ai',
+          text: data.draft_reply,
+          meta: {
+            vibe_score: data.vibe_score,
+            is_approved: data.is_approved,
+            detected_intent: data.detected_intent,
+          },
+        }])
+        setLoading(false)
+        return
+      } catch (err) {
+        if (attempt < maxRetries - 1) {
+          await new Promise(r => setTimeout(r, 1500 * (attempt + 1)))
+        }
+      }
     }
+    setMessages(prev => [...prev, { role: 'ai', text: 'Hmm, the AI is warming up. Give it one more try!' }])
     setLoading(false)
   }
 

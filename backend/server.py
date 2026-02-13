@@ -12,6 +12,7 @@ from typing import Optional, List
 from backend.database import (
     init_db,
     get_dashboard_metrics,
+    get_recent_events,
     create_studio,
     get_studio_by_slug,
     get_default_studio,
@@ -305,7 +306,9 @@ def run_demo(req: DemoRequest, studio: dict = Depends(get_current_studio)):
 def dashboard(studio: dict = Depends(get_optional_studio)):
     """Return aggregated metrics for the owner dashboard."""
     studio_id = studio["id"] if studio else ""
-    return get_dashboard_metrics(studio_id)
+    metrics = get_dashboard_metrics(studio_id)
+    metrics["recent_events"] = get_recent_events(studio_id, limit=20)
+    return metrics
 
 
 @app.get("/api/dashboard/{slug}")
@@ -314,7 +317,18 @@ def dashboard_by_slug(slug: str):
     studio = get_studio_by_slug(slug)
     if not studio:
         raise HTTPException(404, "Studio not found")
-    return get_dashboard_metrics(studio["id"])
+    metrics = get_dashboard_metrics(studio["id"])
+    metrics["recent_events"] = get_recent_events(studio["id"], limit=20)
+    return metrics
+
+
+@app.get("/api/dashboard/{slug}/events")
+def dashboard_events(slug: str, limit: int = 20):
+    """Return recent agent events for a studio's growth feed."""
+    studio = get_studio_by_slug(slug)
+    if not studio:
+        raise HTTPException(404, "Studio not found")
+    return get_recent_events(studio["id"], limit=limit)
 
 
 # ── Vibe Check Endpoints ─────────────────────────────────────────────
