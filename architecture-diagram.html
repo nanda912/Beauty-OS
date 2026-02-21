@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Beauty OS — Architecture Diagram</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f0f0f; color: #fff; font-family: 'Segoe UI', system-ui, sans-serif; padding: 24px; }
+  h1 { text-align: center; font-size: 28px; margin-bottom: 6px; }
+  h1 span { color: #C9A96E; }
+  .subtitle { text-align: center; color: #888; font-size: 14px; margin-bottom: 32px; }
+  .diagram-section { background: #1a1a1a; border-radius: 16px; padding: 28px; margin-bottom: 28px; border: 1px solid #333; }
+  .diagram-section h2 { color: #C9A96E; font-size: 18px; margin-bottom: 16px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  .mermaid { display: flex; justify-content: center; }
+  .mermaid svg { max-width: 100% !important; }
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 20px; text-align: center; }
+  .stat-card .number { font-size: 32px; font-weight: bold; color: #C9A96E; }
+  .stat-card .label { font-size: 12px; color: #888; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<h1>Beauty <span>OS</span> — System Architecture</h1>
+<p class="subtitle">Agentic AI Platform for Beauty Professionals</p>
+
+<div class="stats-row">
+  <div class="stat-card"><div class="number">39</div><div class="label">API Routes</div></div>
+  <div class="stat-card"><div class="number">4</div><div class="label">AI Agents</div></div>
+  <div class="stat-card"><div class="number">9</div><div class="label">DB Tables</div></div>
+  <div class="stat-card"><div class="number">6</div><div class="label">Ext Services</div></div>
+</div>
+
+<div class="diagram-section">
+  <h2>System Overview</h2>
+  <div class="mermaid">
+graph LR
+    subgraph Frontend["FRONTEND — Vercel"]
+        LP["Landing Page"]
+        LOGIN["Login"]
+        WIZARD["Onboarding<br/>Wizard"]
+        DASH["Dashboard"]
+    end
+
+    subgraph Backend["BACKEND — Railway"]
+        API["FastAPI<br/>server.py"]
+        AUTH["Auth<br/>API Key"]
+        SCHED["Scheduler"]
+    end
+
+    subgraph Agents["4 AI AGENTS"]
+        SH["Social<br/>Hunter"]
+        VB["Vibe<br/>Check"]
+        RE["Revenue<br/>Engine"]
+        GF["Gap<br/>Filler"]
+    end
+
+    subgraph Services["EXTERNAL SERVICES"]
+        GEMINI["Gemini<br/>2.0 Flash"]
+        TWILIO["Twilio<br/>SMS"]
+        RESEND["Resend<br/>Email"]
+        REDDIT["Reddit<br/>PRAW"]
+        IG["Instagram<br/>API"]
+    end
+
+    subgraph DB["SQLite DATABASE"]
+        TABLES["9 Tables"]
+    end
+
+    LP --> API
+    LOGIN --> API
+    WIZARD --> API
+    DASH --> API
+    API --> AUTH
+    API --> Agents
+    SCHED -->|1hr| RE
+    SCHED -->|2hr| SH
+    SH --> GEMINI
+    SH --> REDDIT
+    VB --> GEMINI
+    VB --> IG
+    RE --> GEMINI
+    RE --> TWILIO
+    GF --> TWILIO
+    RESEND --> LOGIN
+    Agents --> DB
+  </div>
+</div>
+
+<div class="diagram-section">
+  <h2>The 4 AI Agents — Data Flow Pipeline</h2>
+  <div class="mermaid">
+graph TD
+    subgraph SocialHunter["SOCIAL HUNTER — Lead Generation"]
+        R1["Reddit Posts<br/>r/Atlanta, r/beauty"]
+        R2["PRAW Search<br/>keywords: wax, lash, nail"]
+        R3["Gemini LLM<br/>Evaluate relevance 0-1"]
+        R4["social_leads table<br/>status: new"]
+        R5{"Owner<br/>Reviews"}
+        R6["Approve → Post Reply"]
+        R7["Dismiss"]
+        R1 --> R2 --> R3 --> R4 --> R5
+        R5 -->|Approve| R6
+        R5 -->|Skip| R7
+    end
+
+    subgraph VibeCheck["VIBE CHECK — Lead Screening"]
+        V1["Instagram DM<br/>webhook"]
+        V2["Gemini LLM<br/>Score vibe 0-1"]
+        V3{"Score >= 0.7?"}
+        V4["APPROVED<br/>Send booking link"]
+        V5["DECLINED<br/>Filtered out"]
+        V1 --> V2 --> V3
+        V3 -->|Yes| V4
+        V3 -->|No| V5
+    end
+
+    subgraph RevenueEngine["REVENUE ENGINE — Upselling"]
+        U1["Booking in<br/>24hr window"]
+        U2["Find best<br/>add-on"]
+        U3["Gemini LLM<br/>Draft SMS"]
+        U4["Twilio SMS<br/>to client"]
+        U5{"Client<br/>replies"}
+        U6["YES → Add upsell<br/>+$$$ revenue"]
+        U7["NO → Log decline"]
+        U1 --> U2 --> U3 --> U4 --> U5
+        U5 -->|YES| U6
+        U5 -->|NO| U7
+    end
+
+    subgraph GapFiller["GAP-FILLER — Waitlist Recovery"]
+        G1["Booking<br/>cancelled"]
+        G2["Find waitlist<br/>for service"]
+        G3["SMS first<br/>person"]
+        G4{"Reply?"}
+        G5["YES → Book slot<br/>Zero revenue loss"]
+        G6["NO → Try next<br/>on waitlist"]
+        G1 --> G2 --> G3 --> G4
+        G4 -->|YES| G5
+        G4 -->|NO| G6
+    end
+  </div>
+</div>
+
+<div class="diagram-section">
+  <h2>Database Schema — Entity Relationships</h2>
+  <div class="mermaid">
+erDiagram
+    studios ||--o{ services : has
+    studios ||--o{ clients : has
+    studios ||--o{ agent_events : logs
+    studios ||--o{ social_leads : finds
+    studios ||--o{ magic_tokens : auth
+    studios ||--o{ waitlist : manages
+    services ||--o{ service_addons : has
+    clients ||--o{ bookings : makes
+    clients ||--o{ waitlist : joins
+
+    studios {
+        text id PK
+        text slug UK
+        text api_key UK
+        text name
+        text email
+        text brand_voice
+        real deposit_amount
+        int onboarding_complete
+    }
+    services {
+        text id PK
+        text studio_id FK
+        text name
+        real price
+        int duration_min
+    }
+    service_addons {
+        text id PK
+        text service_id FK
+        text name
+        real price
+        text pitch
+    }
+    clients {
+        text id PK
+        text studio_id FK
+        text name
+        text intake_status
+        real vibe_score
+    }
+    bookings {
+        text id PK
+        text client_id FK
+        text service
+        real final_price
+        text status
+    }
+    social_leads {
+        text id PK
+        text studio_id FK
+        text platform
+        text post_url
+        real match_score
+        text drafted_reply
+        text status
+    }
+    agent_events {
+        text id PK
+        text studio_id FK
+        text agent
+        text action
+        text metadata
+    }
+  </div>
+</div>
+
+<div class="diagram-section">
+  <h2>User Journey — Complete Flow</h2>
+  <div class="mermaid">
+graph LR
+    A["Visit<br/>beauty-os.vercel.app"] --> B["Register<br/>Studio"]
+    B --> C["Onboarding<br/>6-Step Wizard"]
+    C --> C1["1. Add Services"]
+    C1 --> C2["2. Add Upsell Add-ons"]
+    C2 --> C3["3. Set Policies"]
+    C3 --> C4["4. Brand Voice"]
+    C4 --> C5["5. Demo AI"]
+    C5 --> C6["6. Go Live"]
+    C6 --> D["Dashboard<br/>Live Analytics"]
+    D --> E["Agents Run 24/7"]
+    E --> E1["Social Hunter<br/>finds leads"]
+    E --> E2["Vibe Check<br/>screens DMs"]
+    E --> E3["Revenue Engine<br/>upsells"]
+    E --> E4["Gap-Filler<br/>recovers slots"]
+  </div>
+</div>
+
+<div class="diagram-section">
+  <h2>Authentication Flow</h2>
+  <div class="mermaid">
+sequenceDiagram
+    participant U as User
+    participant F as Frontend
+    participant B as Backend
+    participant R as Resend Email
+    participant DB as Database
+
+    Note over U,DB: NEW USER REGISTRATION
+    U->>F: Fill registration form
+    F->>B: POST /api/onboarding/register
+    B->>DB: Create studio + generate API key
+    DB-->>B: studio_id, api_key, slug
+    B-->>F: Return API key
+    F->>F: Store in localStorage
+
+    Note over U,DB: RETURNING USER LOGIN
+    U->>F: Enter email on /login
+    F->>B: POST /api/auth/send-magic-link
+    B->>DB: Lookup studio by email
+    B->>DB: Create 15-min token
+    B->>R: Send magic link email
+    R-->>U: Email with verify link
+    U->>F: Click link in email
+    F->>B: POST /api/auth/verify-magic-link
+    B->>DB: Validate token, mark used
+    B-->>F: Return API key + slug
+    F->>F: Store in localStorage, redirect
+  </div>
+</div>
+
+<div class="diagram-section">
+  <h2>Deployment Architecture</h2>
+  <div class="mermaid">
+graph LR
+    subgraph User["USER"]
+        BROWSER["Browser"]
+    end
+
+    subgraph Vercel["VERCEL — Frontend"]
+        REACT["React + Vite<br/>SPA"]
+        REWRITE["/api/* rewrite<br/>to Railway"]
+    end
+
+    subgraph Railway["RAILWAY — Backend"]
+        FASTAPI["FastAPI<br/>server.py"]
+        SQLITE["SQLite<br/>beauty_os.db"]
+        SCHEDULER["Scheduler<br/>Background jobs"]
+    end
+
+    subgraph Monitor["MONITORING"]
+        UPTIMEROBOT["UptimeRobot<br/>5-min pings"]
+    end
+
+    subgraph ExtAPIs["EXTERNAL APIs"]
+        GEM["Google Gemini"]
+        TW["Twilio"]
+        RS["Resend"]
+        RD["Reddit"]
+        INST["Instagram"]
+    end
+
+    BROWSER --> REACT
+    REACT --> REWRITE
+    REWRITE --> FASTAPI
+    FASTAPI --> SQLITE
+    SCHEDULER --> FASTAPI
+    UPTIMEROBOT -->|GET /health| FASTAPI
+    FASTAPI --> ExtAPIs
+  </div>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#C9A96E',
+      primaryTextColor: '#fff',
+      primaryBorderColor: '#C9A96E',
+      lineColor: '#C9A96E',
+      secondaryColor: '#2a2a2a',
+      tertiaryColor: '#1a1a1a',
+      background: '#1a1a1a',
+      mainBkg: '#2a2a2a',
+      nodeBorder: '#C9A96E',
+      clusterBkg: '#1f1f1f',
+      clusterBorder: '#444',
+      titleColor: '#C9A96E',
+      edgeLabelBackground: '#1a1a1a',
+      nodeTextColor: '#fff',
+    },
+    flowchart: { curve: 'basis', padding: 20 },
+    er: { fontSize: 12 },
+    sequence: { actorFontSize: 12, messageFontSize: 12 }
+  });
+</script>
+
+</body>
+</html>
