@@ -24,15 +24,16 @@ def run_upsell_check():
 
 
 def run_social_hunter_scan():
-    """Scan Reddit for beauty service leads across all studios."""
-    print("[Scheduler] Running Social Hunter scan...")
+    """Scan Reddit and Google Maps for beauty service leads across all studios."""
+    print("[Scheduler] Running Social Hunter scan (Reddit + Google Maps)...")
     results = run_social_hunter_all_studios()
     for r in results:
+        source = r.get("source", "unknown")
         if "error" in r:
-            print(f"  - Studio {r['studio_id'][:8]}...: {r['error']}")
+            print(f"  - Studio {r['studio_id'][:8]}... [{source}]: {r['error']}")
         else:
-            print(f"  - Studio {r['studio_id'][:8]}...: {r.get('leads_saved', 0)} leads saved")
-    print(f"[Scheduler] Social Hunter scan complete. {len(results)} studio(s) processed.")
+            print(f"  - Studio {r['studio_id'][:8]}... [{source}]: {r.get('leads_saved', 0)} leads saved")
+    print(f"[Scheduler] Social Hunter scan complete. {len(results)} scan(s) processed.")
 
 
 def main():
@@ -40,7 +41,7 @@ def main():
     init_db()
     print("[Scheduler] Beauty OS scheduler started.")
     print("[Scheduler] Upsell check runs every hour.")
-    print("[Scheduler] Social Hunter scan runs every 2 hours.")
+    print("[Scheduler] Social Hunter scan (Reddit + Google Maps) runs every 2 hours.")
 
     # Run immediately on start, then on schedule
     run_upsell_check()

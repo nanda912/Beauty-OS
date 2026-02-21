@@ -38,7 +38,7 @@ from backend.services.email import send_magic_link
 from backend.agents.vibe_check import evaluate_lead, evaluate_policy_confirmation
 from backend.agents.revenue_engine import process_upsell_window, handle_upsell_reply
 from backend.agents.gap_filler import handle_cancellation, handle_gap_fill_reply
-from backend.agents.social_hunter import run_social_hunter, approve_and_reply, dismiss_lead
+from backend.agents.social_hunter import run_social_hunter, run_google_maps_hunter, approve_and_reply, dismiss_lead
 
 app = FastAPI(title="Beauty OS", version="2.0.0")
 
@@ -271,6 +271,7 @@ class PoliciesRequest(BaseModel):
     late_fee: Optional[float] = None
     cancel_window_hours: Optional[int] = None
     booking_url: Optional[str] = None
+    location: Optional[str] = None
 
 
 @app.put("/api/onboarding/policies")
@@ -289,6 +290,7 @@ def get_policies(studio: dict = Depends(get_current_studio)):
         "late_fee": studio["late_fee"],
         "cancel_window_hours": studio["cancel_window_hours"],
         "booking_url": studio["booking_url"],
+        "location": studio.get("location", ""),
     }
 
 
@@ -341,6 +343,7 @@ def get_studio_public(slug: str):
         "ig_handle": studio["ig_handle"],
         "brand_voice": studio["brand_voice"],
         "onboarding_complete": bool(studio["onboarding_complete"]),
+        "location": studio.get("location", ""),
     }
 
 
@@ -534,7 +537,7 @@ def list_social_leads(
 
 @app.post("/api/social-leads/{lead_id}/approve")
 def approve_social_lead(lead_id: str, studio: dict = Depends(get_current_studio)):
-    """Approve a social lead and post the drafted reply to Reddit."""
+    """Approve a social lead. Reddit: post reply. Google Maps: mark contacted."""
     result = approve_and_reply(lead_id, studio_id=studio["id"])
     if "error" in result:
         raise HTTPException(400, result["error"])
@@ -561,6 +564,27 @@ def trigger_social_hunter(
         dry_run=req.dry_run,
         subreddits=req.subreddits,
         keywords=req.keywords,
+    )
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result
+
+
+class GoogleMapsHunterRunRequest(BaseModel):
+    max_rating: int = 2
+    business_types: Optional[List[str]] = None
+
+
+@app.post("/api/social-hunter/run-gmaps")
+def trigger_google_maps_hunter(
+    req: GoogleMapsHunterRunRequest,
+    studio: dict = Depends(get_current_studio),
+):
+    """Manually trigger a Google Maps competitor review scan for this studio."""
+    result = run_google_maps_hunter(
+        studio_id=studio["id"],
+        max_rating=req.max_rating,
+        business_types=req.business_types,
     )
     if "error" in result:
         raise HTTPException(400, result["error"])

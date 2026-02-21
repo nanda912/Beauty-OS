@@ -55,3 +55,11 @@ REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
 REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "BeautyOS:v1.0 (by /u/beautyos_bot)")
 REDDIT_USERNAME = os.getenv("REDDIT_USERNAME", "")
 REDDIT_PASSWORD = os.getenv("REDDIT_PASSWORD", "")
+
+# ── Google Maps (Social Hunter) ──────────────────────────────────
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
+GOOGLE_MAPS_SEARCH_RADIUS = int(os.getenv("GOOGLE_MAPS_SEARCH_RADIUS", "8000"))  # meters (~5 miles)
+GOOGLE_MAPS_BUSINESS_TYPES = os.getenv(
+    "GOOGLE_MAPS_BUSINESS_TYPES",
+    "beauty_salon,hair_salon,nail_salon,spa"
+).split(",")

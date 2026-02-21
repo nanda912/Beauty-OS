@@ -183,11 +183,20 @@ function eventToDisplay(event) {
   if (event.agent === 'gap_filler' && event.action === 'slot_filled') {
     return { icon: '📅', text: 'Cancelled slot recovered from waitlist', type: 'recovered' }
   }
+  if (event.agent === 'social_hunter' && event.action === 'lead_found' && meta.platform === 'google_maps') {
+    return { icon: '📍', text: `Review lead found at ${meta.place_name || 'competitor'} (${(meta.match_score * 100).toFixed(0)}% match)`, type: 'social' }
+  }
   if (event.agent === 'social_hunter' && event.action === 'lead_found') {
     return { icon: '🎯', text: `Social lead found on r/${meta.subreddit || 'reddit'} (${(meta.match_score * 100).toFixed(0)}% match)`, type: 'social' }
   }
   if (event.agent === 'social_hunter' && event.action === 'reply_posted') {
     return { icon: '💬', text: 'Social reply posted to Reddit', type: 'social' }
+  }
+  if (event.agent === 'social_hunter' && event.action === 'gmaps_lead_approved') {
+    return { icon: '📍', text: `Google Maps lead approved — ${meta.place_name || 'competitor'}`, type: 'social' }
+  }
+  if (event.agent === 'social_hunter' && event.action === 'gmaps_scan_complete') {
+    return { icon: '📍', text: `Maps scan: ${meta.leads_saved || 0} new leads from competitor reviews`, type: 'social' }
   }
   if (event.agent === 'social_hunter' && event.action === 'scan_complete') {
     return { icon: '🔍', text: `Social Hunter scan: ${meta.leads_saved || 0} new leads`, type: 'social' }
@@ -275,10 +284,19 @@ function SocialLeadsPanel() {
   async function handleApprove(leadId) {
     setActionLoading(leadId)
     try {
-      await fetch(`${API_BASE}/social-leads/${leadId}/approve`, {
+      const res = await fetch(`${API_BASE}/social-leads/${leadId}/approve`, {
         method: 'POST',
         headers: { 'X-API-Key': localStorage.getItem('beautyos_api_key') || '' },
       })
+      const data = await res.json()
+      // If Google Maps lead, copy outreach template to clipboard
+      if (data.outreach_template) {
+        try {
+          await navigator.clipboard.writeText(data.outreach_template)
+        } catch {
+          // Clipboard API may fail — template is still visible in the card
+        }
+      }
       await fetchLeads()
     } catch {
       // silently fail
@@ -336,7 +354,7 @@ function SocialLeadsPanel() {
       ) : leads.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-brand-charcoal/40 text-sm">No social leads yet.</p>
-          <p className="text-brand-charcoal/30 text-xs mt-1">The Social Hunter scans Reddit every 2 hours.</p>
+          <p className="text-brand-charcoal/30 text-xs mt-1">The Social Hunter scans Reddit and competitor Google Maps reviews every 2 hours.</p>
         </div>
       ) : (
         <div className="space-y-3 max-h-[400px] overflow-y-auto">
@@ -345,9 +363,15 @@ function SocialLeadsPanel() {
               {/* Header */}
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-brand-charcoal/40">
-                    r/{lead.subreddit}
-                  </span>
+                  {lead.platform === 'google_maps' ? (
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+                      Google Maps
+                    </span>
+                  ) : (
+                    <span className="text-xs font-medium text-brand-charcoal/40">
+                      r/{lead.subreddit}
+                    </span>
+                  )}
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[lead.status] || ''}`}>
                     {lead.status}
                   </span>
@@ -355,14 +379,18 @@ function SocialLeadsPanel() {
                     {(lead.match_score * 100).toFixed(0)}% match
                   </span>
                 </div>
-                <a
-                  href={lead.post_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-brand-gold hover:underline"
-                >
-                  View post
-                </a>
+                {lead.post_url ? (
+                  <a
+                    href={lead.post_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-brand-gold hover:underline"
+                  >
+                    View post
+                  </a>
+                ) : lead.platform === 'google_maps' ? (
+                  <span className="text-xs text-brand-charcoal/30">{lead.subreddit}</span>
+                ) : null}
               </div>
 
               {/* Post title + snippet */}
@@ -394,7 +422,8 @@ function SocialLeadsPanel() {
                     disabled={actionLoading === lead.id}
                     className="flex-1 py-2 bg-brand-gold text-white rounded-lg text-xs font-medium hover:bg-brand-gold-dark transition disabled:opacity-50"
                   >
-                    {actionLoading === lead.id ? '...' : 'Approve & Reply'}
+                    {actionLoading === lead.id ? '...' :
+                      lead.platform === 'google_maps' ? 'Copy Outreach Template' : 'Approve & Reply'}
                   </button>
                   <button
                     onClick={() => handleDismiss(lead.id)}

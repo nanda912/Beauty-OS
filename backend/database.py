@@ -182,7 +182,7 @@ def init_db():
                 id              TEXT PRIMARY KEY,
                 studio_id       TEXT NOT NULL REFERENCES studios(id),
                 platform        TEXT NOT NULL DEFAULT 'reddit'
-                                    CHECK(platform IN ('reddit','instagram','twitter')),
+                                    CHECK(platform IN ('reddit','instagram','twitter','google_maps')),
                 post_id         TEXT NOT NULL,
                 post_url        TEXT DEFAULT '',
                 post_title      TEXT DEFAULT '',
@@ -204,6 +204,8 @@ def init_db():
     # ── Migrations (safe to re-run) ────────────────────────────────
     _migrate_add_email_column()
     _migrate_add_social_hunter()
+    _migrate_add_location_column()
+    _migrate_add_google_maps_platform()
 
     # Seed default studio if none exist
     _seed_default_studio()
@@ -251,6 +253,53 @@ def _migrate_add_social_hunter():
                 CREATE INDEX IF NOT EXISTS idx_social_leads_status ON social_leads(studio_id, status);
                 CREATE INDEX IF NOT EXISTS idx_social_leads_post_id ON social_leads(post_id);
             """)
+
+
+def _migrate_add_location_column():
+    """Add location column to studios if it doesn't exist yet."""
+    with get_db() as db:
+        cols = [row[1] for row in db.execute("PRAGMA table_info(studios)").fetchall()]
+        if "location" not in cols:
+            db.execute("ALTER TABLE studios ADD COLUMN location TEXT DEFAULT ''")
+
+
+def _migrate_add_google_maps_platform():
+    """Widen social_leads platform CHECK to include 'google_maps'."""
+    with get_db() as db:
+        schema = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='social_leads'"
+        ).fetchone()
+        if schema and "google_maps" in schema[0]:
+            return  # Already migrated
+        if not schema:
+            return  # Table doesn't exist yet, init_db will create it with correct CHECK
+
+        db.executescript("""
+            CREATE TABLE IF NOT EXISTS social_leads_new (
+                id              TEXT PRIMARY KEY,
+                studio_id       TEXT NOT NULL REFERENCES studios(id),
+                platform        TEXT NOT NULL DEFAULT 'reddit'
+                                    CHECK(platform IN ('reddit','instagram','twitter','google_maps')),
+                post_id         TEXT NOT NULL,
+                post_url        TEXT DEFAULT '',
+                post_title      TEXT DEFAULT '',
+                post_body       TEXT DEFAULT '',
+                subreddit       TEXT DEFAULT '',
+                author          TEXT DEFAULT '',
+                match_score     REAL DEFAULT 0.0,
+                match_reasoning TEXT DEFAULT '',
+                drafted_reply   TEXT DEFAULT '',
+                status          TEXT DEFAULT 'new'
+                                    CHECK(status IN ('new','approved','replied','dismissed','failed')),
+                created_at      TEXT DEFAULT (datetime('now'))
+            );
+            INSERT OR IGNORE INTO social_leads_new SELECT * FROM social_leads;
+            DROP TABLE social_leads;
+            ALTER TABLE social_leads_new RENAME TO social_leads;
+            CREATE INDEX IF NOT EXISTS idx_social_leads_studio ON social_leads(studio_id);
+            CREATE INDEX IF NOT EXISTS idx_social_leads_status ON social_leads(studio_id, status);
+            CREATE INDEX IF NOT EXISTS idx_social_leads_post_id ON social_leads(post_id);
+        """)
 
 
 def _seed_default_studio():
@@ -313,7 +362,7 @@ def get_default_studio() -> dict | None:
 def update_studio(studio_id: str, **fields):
     allowed = {"name", "owner_name", "phone", "ig_handle", "brand_voice",
                "deposit_amount", "late_fee", "cancel_window_hours", "booking_url",
-               "onboarding_complete", "email"}
+               "onboarding_complete", "email", "location"}
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
         return

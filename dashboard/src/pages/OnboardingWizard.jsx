@@ -280,6 +280,7 @@ function PoliciesStep({ onNext, onBack }) {
     late_fee: 15,
     cancel_window_hours: 24,
     booking_url: '',
+    location: '',
   })
   const [saving, setSaving] = useState(false)
 
@@ -367,6 +368,20 @@ function PoliciesStep({ onNext, onBack }) {
             className="w-full px-4 py-3 border border-brand-pink/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
           />
           <p className="text-xs text-brand-charcoal/40 mt-1">The AI sends this link once a client passes screening.</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-brand-charcoal/70 mb-1">
+            Studio Location
+          </label>
+          <input
+            type="text"
+            placeholder="Zip code or city (e.g., 30301 or Atlanta, GA)"
+            value={policies.location || ''}
+            onChange={(e) => setPolicies({ ...policies, location: e.target.value })}
+            className="w-full px-4 py-3 border border-brand-pink/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+          />
+          <p className="text-xs text-brand-charcoal/40 mt-1">Used by Social Hunter to scan competitor reviews near you.</p>
         </div>
       </div>
 
